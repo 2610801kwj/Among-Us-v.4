@@ -812,14 +812,35 @@ function createRoom(){
 }
 function joinRoom(){
   const code=document.getElementById('room-code').value.toUpperCase().trim();
+  if(!code) { alert('방 코드를 입력해주세요!'); return; }
+
+  // 1. 누르자마자 로딩 표시 (반응이 없던 문제 해결)
+  const btn = event.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ 연결 중... (최대 5초)';
+  btn.disabled = true;
+
   peer=new Peer();
+  
+  // 2. 에러가 났을 때 화면에 알려주는 안전장치 (먹통 방지)
+  peer.on('error', err => {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    alert('❌ 연결 실패! 방 코드를 확인하거나 잠시 후 다시 시도하세요.\\n원인: ' + err.type);
+  });
+
   peer.on('open',id=>{
-    myId=id;hostConn=peer.connect('AMG3-'+code);
+    myId=id;
+    hostConn=peer.connect('AMG3-'+code);
+    
     hostConn.on('open',()=>{
+      btn.innerHTML = originalText;
+      btn.disabled = false;
       enterGame('게임 참여 중...');
       hostConn.send({type:'join',name:document.getElementById('nickname').value||'Player',color:myColor,hat:myHat});
       startLoop();
     });
+    
     hostConn.on('data',d=>{
       if(d.type==='state')syncState(d.gs);
       if(d.type==='full'){alert('❌ 방이 가득 찼습니다 (최대 10명)');document.getElementById('game-ui').style.display='none';document.getElementById('menu-ui').style.display='flex';return;}
@@ -831,7 +852,8 @@ function joinRoom(){
     });
   });
 }
-function enterGame(info){
+
+  function enterGame(info){
   document.getElementById('menu-ui').style.display='none';
   document.getElementById('game-ui').style.display='block';
   document.getElementById('minimap-container').style.display='block';
