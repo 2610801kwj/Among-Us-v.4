@@ -2165,6 +2165,23 @@ if (typeof originalTick === 'function') {
   if (window.tick) window.tick = newLoop;
   else if (window.loop) window.loop = newLoop;
 }
+// =================================================================
+// 🧹 [귀찮음 해결용] 하단 찌꺼기 코드 강제 무력화 및 엔진 정상화
+// =================================================================
+
+// 1. 중복 차단 자물쇠 변수를 무조건 false로 고정해서 엔진이 멈추지 않게 합니다.
+window.isLoopRunning = false;
+Object.defineProperty(window, 'isLoopRunning', {
+  get: function() { return false; },
+  set: function() { } // 외부에서 true로 바꾸려고 해도 절대 안 바뀌게 차단
+});
+
+// 2. 아까 가로챘던 틱/루프 함수가 있다면, 원래 원본 함수로 강제 복구합니다.
+// 혹시 검은 화면이 되었던 원인을 강제로 지워버리는 코드입니다.
+if (typeof originalTick === 'function') {
+  if (window.tick) window.tick = originalTick;
+  if (window.loop) window.loop = originalTick;
+}
 </script>
 </body>
 </html>
