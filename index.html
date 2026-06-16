@@ -2083,6 +2083,85 @@ function updateDevInfo(){
 
 // ─── boot ───
 buildCustomUI();
+// ==========================================
+// [오류 수정 전용 코드] 
+// 봇 추가 없음! 다른 사람 접속 차단 없음!
+// ==========================================
+
+// 1. 개발자 모드 미션 튕김/오류 방지 (오직 내 캐릭터만 세팅)
+function devOpenTask(taskType) {
+    GS.phase = 'Playing'; 
+    if (!myId) myId = "DEV_PLAYER"; 
+    if (!GS.players[myId]) {
+        GS.players[myId] = {
+            x: 1050, y: 900, color: '#c51111', name: '개발자',
+            isDead: false, facing: 1, isMoving: false, inVent: -1, tasks: {} 
+        };
+        GS.roles[myId] = 'crewmate';
+    }
+    currentTaskId = "DEV_TEST_" + taskType;
+    const overlays = document.querySelectorAll('.overlay');
+    overlays.forEach(el => el.style.display = 'none');
+    startMinigame(taskType);
+}
+
+// 2. 미션 완료 시 멈추거나 튕기는 현상 수정 (정상 멀티플레이 통신은 유지)
+function completeCurrentTask() {
+    if (currentTaskId === null) return;
+    
+    // 개발자 테스트 미션인 경우 무시하고 창 닫기
+    if (typeof currentTaskId === 'string' && currentTaskId.startsWith("DEV_TEST_")) {
+        closeMinigame();
+        return;
+    }
+
+    const t = MAP.tasks.find(z => z.id === currentTaskId);
+    if (!t) {
+        closeMinigame();
+        return;
+    }
+    
+    if (t.isSab) {
+        if (isHost) { GS.sabActive = null; } 
+        else if (typeof hostConn !== 'undefined' && hostConn) hostConn.send({type: 'action', action: 'fix_sab', extra: {sabType: t.sabType}});
+        GS.sabActive = null; 
+        if (typeof bcastSnd === 'function') bcastSnd('task');
+    } else {
+        myLocalTasks.push(currentTaskId);
+        if (t.visual) { 
+            GS.visualTasks[currentTaskId] = GS.visualTasks[currentTaskId] || [];
+            GS.visualTasks[currentTaskId].push(myId);
+        }
+        if (isHost) { 
+            GS.tasksCompleted++; 
+            if(typeof checkWin === 'function') checkWin(); 
+            if (typeof snd === 'function') snd('task');
+        } else if (typeof hostConn !== 'undefined' && hostConn) {
+            hostConn.send({type: 'task_done'});
+        }
+    }
+    closeMinigame();
+}
+
+// 3. 미션 틀렸을 때 연료충전 무한 반복되는 오류 수정
+function closeMinigame() {
+    const minigamePopup = document.getElementById('minigame-popup');
+    if (minigamePopup) minigamePopup.style.display = 'none';
+    
+    currentMinigame = null;
+    currentTaskId = null;
+    
+    // 이전 찌꺼기 화면 지우기
+    const taskCanvas = document.getElementById('task-canvas');
+    if (taskCanvas) {
+        const ctx = taskCanvas.getContext('2d');
+        ctx.clearRect(0, 0, taskCanvas.width, taskCanvas.height);
+    }
+}
+// ==========================================
+// 여기까지 복사
+// ==========================================
+
 </script>
 </body>
 </html>
