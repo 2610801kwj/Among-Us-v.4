@@ -2028,7 +2028,6 @@ function devSetRole(role){
   }
 }
 function devOpenTask(type){
-  // 1. 미션 완료 버그(튕김, 무한 반복)를 막기 위한 임시 ID 세팅
   window.currentTaskId = "DEV_TEST_" + type;
 
   if(!myId)return;
@@ -2037,11 +2036,9 @@ function devOpenTask(type){
   const t=MAP.tasks.find(tk=>tk.type===type&&!tk.isSab);
   if(t&&GS.players[myId]){GS.players[myId].x=t.x+t.w/2;GS.players[myId].y=t.y+t.h/2;}
   
-  // 2. 원래 코드가 999로 덮어쓰던 버그 수정
   currentTaskId = window.currentTaskId; 
   openTask(currentTaskId, type);
   devLog(`태스크 열기: ${type}`);
-}
 }
 function devSabotage(type){
   GS.sabActive=type;GS.sabTimer=type==='lights'?45:60;
