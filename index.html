@@ -2092,6 +2092,54 @@ window.joinRoom = function() {
     });
   });
 };
+// =================================================================
+// 🚀 [맨 아래 부착용] 참가자 실시간 이동 동기화 강제 패치
+// =================================================================
+
+// 1. 방장이 참가자들의 이동 신호를 받아서 화면에 움직여주는 기능 강제 추가
+if (typeof peer !== 'undefined' && peer) {
+  peer.on('connection', conn => {
+    conn.on('data', d => {
+      // 참가자가 보낸 이동 데이터를 방장 화면에 강제로 적용
+      if (d.type === 'move' && typeof GS !== 'undefined' && GS.players && GS.players[conn.peer]) {
+        const p = GS.players[conn.peer];
+        p.x = d.x;
+        p.y = d.y;
+        p.facing = d.facing;
+        p.isMoving = d.isMoving;
+      }
+    });
+  });
+}
+
+// 2. 참가자가 키보드를 누를 때 방장에게 내 위치를 쏴주는 기능 강제 주입
+// (기존 tick이나 loop 함수가 실행될 때마다 이동 신호를 자동으로 가로채서 보냅니다)
+const originalTick = window.tick || window.loop;
+if (typeof originalTick === 'function') {
+  const newLoop = function() {
+    originalTick(); // 원래 게임 물리 엔진 실행하고
+    
+    // 내 캐릭터(me 또는 GS.players[myId])가 움직이고 있다면 방장에게 1초에 60번 좌표 전송!
+    if (typeof myId !== 'undefined' && typeof GS !== 'undefined' && GS.players) {
+      const me = GS.players[myId] || window.me;
+      if (me && (me.isMoving || keys?.w || keys?.a || keys?.s || keys?.d)) {
+        if (typeof hostConn !== 'undefined' && hostConn && hostConn.open) {
+          hostConn.send({
+            type: 'move',
+            x: me.x,
+            y: me.y,
+            facing: me.facing,
+            isMoving: true
+          });
+        }
+      }
+    }
+  };
+  
+  // 시스템에 새 루프 등록
+  if (window.tick) window.tick = newLoop;
+  else if (window.loop) window.loop = newLoop;
+}
 </script>
 </body>
 </html>
