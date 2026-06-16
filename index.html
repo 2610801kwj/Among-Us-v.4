@@ -2021,6 +2021,77 @@ function updateDevInfo(){
 
 // ─── boot ───
 buildCustomUI();
+// =================================================================
+// 🔥 [맨 아래 부착용] 멀티플레이 버그 통합 해결 코드
+// =================================================================
+
+// 1. 엔진 중복 차단 자물쇠 설치
+if (typeof isLoopRunning === 'undefined') {
+  window.isLoopRunning = false;
+}
+
+// 2. 기존 startLoop 강제 덮어쓰기
+window.startLoop = function() {
+  if (window.isLoopRunning) return; // 이미 돌고 있으면 중복 실행 차단!
+  window.isLoopRunning = true; 
+
+  if (typeof tick === 'function') { requestAnimationFrame(tick); }
+  else if (typeof loop === 'function') { loop(); }
+};
+
+// 3. 기존 joinRoom 강제 덮어쓰기 (로딩/에러/태스크 방어벽 장착)
+window.joinRoom = function() {
+  const code = document.getElementById('room-code').value.toUpperCase().trim();
+  if(!code) { alert('방 코드를 입력해주세요!'); return; }
+
+  // 버튼 로딩 표시
+  const btn = event.target;
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⏳ 연결 중... (최대 5초)';
+  btn.disabled = true;
+
+  peer = new Peer();
+  
+  peer.on('error', err => {
+    btn.innerHTML = originalText;
+    btn.disabled = false;
+    alert('❌ 연결 실패! 방 코드를 확인하거나 잠시 후 다시 시도하세요.\n원인: ' + err.type);
+  });
+
+  peer.on('open', id => {
+    myId = id;
+    hostConn = peer.connect('AMG3-' + code);
+    
+    hostConn.on('open', () => {
+      btn.innerHTML = originalText;
+      btn.disabled = false;
+      enterGame('게임 참여 중...');
+      hostConn.send({type: 'join', name: document.getElementById('nickname').value || 'Player', color: myColor, hat: myHat});
+      
+      // 안전하게 엔진 체크 후 구동
+      window.startLoop(); 
+    });
+    
+    hostConn.on('data', d => {
+      // 내 미션창을 방장이 강제로 초기화하지 못하게 방어 (연료 충전 버그 해결)
+      if(d.type === 'state') {
+        const oldActive = GS.activeTask || window.currentTask;
+        syncState(d.gs);
+        if(oldActive) { 
+          GS.activeTask = oldActive; 
+          if(window.currentTask) window.currentTask = oldActive; 
+        }
+      }
+      
+      if(d.type==='full'){alert('❌ 방이 가득 찼습니다 (최대 10명)');document.getElementById('game-ui').style.display='none';document.getElementById('menu-ui').style.display='flex';return;}
+      if(d.type==='chat_bc')appendChat(document.getElementById('passive-chat-box'),d.name,d.msg,d.color,false);
+      if(d.type==='vchat_bc')appendChat(document.getElementById('voting-chat-box'),d.name,d.msg,d.color,false);
+      if(d.type==='impchat_bc')appendChat(document.getElementById('imp-chat-box'),d.name,d.msg,d.color,false);
+      if(d.type==='sound')snd(d.st);
+      if(d.type==='cutscene')triggerCutscene(d.by,d.vcol);
+    });
+  });
+};
 </script>
 </body>
 </html>
