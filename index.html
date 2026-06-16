@@ -790,50 +790,51 @@ function createRoom(){
     addPlayer(myId,document.getElementById('nickname').value||'Host',myColor,myHat);
     startLoop();
   });
-  peer.on('connection',conn=>{
-  conn.on('open',()=>{
-    // 10명 제한 규칙 유지
-    if(Object.keys(GS.players).length>=10){conn.send({type:'full'});conn.close();return;}
-    clients[conn.peer]=conn;
+  peer.on('connection', conn => {
+  conn.on('open', () => {
+    if (Object.keys(GS.players).length >= 10) {
+      conn.send({ type: 'full' });
+      conn.close();
+      return;
+    }
+    clients[conn.peer] = conn;
     
-    conn.on('data',d=>{
-      if(d.type==='join') {
-        addPlayer(conn.peer,d.name,d.color,d.hat);
+    conn.on('data', d => {
+      if (d.type === 'join') {
+        addPlayer(conn.peer, d.name, d.color, d.hat);
       }
-      else if(d.type==='input') {
-        // 참가자의 움직임 입력 처리
-        handleMove(conn.peer,d.keys,d.vec);
-        // [수정] 방장이 움직임을 처리한 후, 즉시 모든 참가자에게 "얘 움직였다!" 하고 전체 갱신 신호(state)를 쏴줍니다.
-        broadcast({type:'state', gs:GS}); 
+      else if (d.type === 'input') {
+        handleMove(conn.peer, d.keys, d.vec);
+        broadcast({ type: 'state', gs: GS }); 
       }
-      else if(d.type==='action') {
-        processAction(conn.peer,d.action,d.extra);
+      else if (d.type === 'action') {
+        processAction(conn.peer, d.action, d.extra);
       }
-      else if(d.type==='vote') {
-        handleVote(conn.peer,d.tid);
+      else if (d.type === 'vote') {
+        handleVote(conn.peer, d.tid);
       }
-      else if(d.type==='chat'){
-        if(d.ctx==='imp'){if(GS.imposters.includes(conn.peer))relayImpChat(conn.peer,d.msg);}
-        else relayChat(conn.peer,d.msg,d.ctx||'passive');
+      else if (d.type === 'chat') {
+        if (d.ctx === 'imp') {
+          if (GS.imposters.includes(conn.peer)) relayImpChat(conn.peer, d.msg);
+        } else {
+          relayChat(conn.peer, d.msg, d.ctx || 'passive');
+        }
       }
-      else if(d.type==='task_done'){
+      else if (d.type === 'task_done') {
         GS.tasksCompleted++;
         checkWin();
-        // 사운드 함수 안전 체크 후 재생
-        if(typeof snd === 'function') snd('task');
-        // [수정] 참가자가 미션을 깨면, 방장이 게이지를 올린 뒤 모든 참가자에게 즉시 동기화 신호를 보냅니다. (태스크 먹통 해결)
-        broadcast({type:'state', gs:GS});
+        if (typeof snd === 'function') snd('task');
+        broadcast({ type: 'state', gs: GS });
       }
-      else if(d.type==='vent') {
-        // [수정] 임포스터만 벤트를 탈 수 있도록 방장 선에서 한 번 더 철저하게 검증합니다.
-        if(GS.roles[conn.peer] === 'imposter') {
+      else if (d.type === 'vent') {
+        if (GS.roles[conn.peer] === 'imposter') {
           handleVent(conn.peer);
         }
       }
     });
   });
 });
-});
+}
 function joinRoom(){
   const code=document.getElementById('room-code').value.toUpperCase().trim();
   if(!code) { alert('방 코드를 입력해주세요!'); return; }
