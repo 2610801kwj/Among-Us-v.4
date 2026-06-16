@@ -2102,7 +2102,8 @@ function devOpenTask(taskType) {
     currentTaskId = "DEV_TEST_" + taskType;
     const overlays = document.querySelectorAll('.overlay');
     overlays.forEach(el => el.style.display = 'none');
-    startMinigame(taskType);
+  window.currentTaskId = "DEV_TEST_" + taskType;  
+  startMinigame(taskType);
 }
 
 // 2. 미션 완료 시 멈추거나 튕기는 현상 수정 (정상 멀티플레이 통신은 유지)
