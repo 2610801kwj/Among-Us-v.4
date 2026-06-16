@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+
   <script>
 window.onerror = function(msg, url, line) {
     alert("🚨 에러 발생!\n내용: " + msg + "\n줄 번호: " + line);
@@ -354,98 +356,6 @@ hr{border-color:#1e2535;margin:14px 0}
 </div>
 
 <script>
-// ═══════════════════════════════
-//  NETWORKING LAYER (BroadcastChannel 기반 - 같은 기기 여러 탭)
-// ═══════════════════════════════
-// PeerJS 대신 BroadcastChannel을 사용합니다.
-// 같은 기기의 여러 탭(또는 창)으로 멀티플레이어가 가능합니다.
-// 방 코드를 다른 탭에서 입력하면 접속됩니다.
-
-class FakePeer {
-  constructor(id) {
-    this._id = id || ('P-' + Math.random().toString(36).substr(2,8).toUpperCase());
-    this._handlers = {};
-    this._channel = new BroadcastChannel('amgus_' + (id ? id : '__lobby__'));
-    // Listen for incoming connections (host side)
-    this._lobbyChannel = new BroadcastChannel('amgus___lobby__');
-    this._connections = {};
-    this._openCalled = false;
-    setTimeout(() => {
-      this._openCalled = true;
-      this._emit('open', this._id);
-    }, 50);
-    this._channel.onmessage = (ev) => {
-      const {type, from, to, data} = ev.data || {};
-      if (type === 'connect_req' && to === this._id) {
-        // incoming connection request
-        const conn = new FakeConn(this._id, from);
-        this._connections[from] = conn;
-        this._emit('connection', conn);
-        // ack
-        new BroadcastChannel('amgus___lobby__').postMessage({type:'connect_ack', from:this._id, to:from});
-      }
-    };
-  }
-  _emit(event, ...args) {
-    (this._handlers[event]||[]).forEach(h => h(...args));
-  }
-  on(event, handler) {
-    this._handlers[event] = this._handlers[event] || [];
-    this._handlers[event].push(handler);
-    return this;
-  }
-  connect(targetId) {
-    const conn = new FakeConn(this._id, targetId);
-    // send connect request
-    const ch = new BroadcastChannel('amgus_' + targetId);
-    ch.postMessage({type:'connect_req', from:this._id, to:targetId});
-    // wait for ack
-    const lobby = new BroadcastChannel('amgus___lobby__');
-    lobby.onmessage = (ev) => {
-      const {type, from, to} = ev.data || {};
-      if (type === 'connect_ack' && from === targetId && to === this._id) {
-        conn._emit('open');
-      }
-    };
-    return conn;
-  }
-  destroy() {
-    this._channel.close();
-  }
-}
-
-class FakeConn {
-  constructor(myId, peerId) {
-    this.peer = peerId;
-    this._myId = myId;
-    this._handlers = {};
-    this._sendCh = new BroadcastChannel('amgus_msg_' + myId + '_' + peerId);
-    this._recvCh = new BroadcastChannel('amgus_msg_' + peerId + '_' + myId);
-    this._recvCh.onmessage = (ev) => {
-      this._emit('data', ev.data);
-    };
-    this.open = true;
-  }
-  _emit(event, ...args) {
-    (this._handlers[event]||[]).forEach(h => h(...args));
-  }
-  on(event, handler) {
-    this._handlers[event] = this._handlers[event] || [];
-    this._handlers[event].push(handler);
-    return this;
-  }
-  send(data) {
-    try { this._sendCh.postMessage(data); } catch(e) {}
-  }
-  close() {
-    this.open = false;
-    this._sendCh.close();
-    this._recvCh.close();
-  }
-}
-
-// Peer = FakePeer (PeerJS 대체)
-const Peer = FakePeer;
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 <script>
@@ -1585,6 +1495,8 @@ function performTask(){
 }
 
 function completeCurrentTask(){
+  if (typeof currentTaskId === 'string' && currentTaskId.startsWith('DEV_TEST_')) { closeMinigame(); return; }
+
   if(currentTaskId===null)return;
   const t=MAP.tasks.find(z=>z.id===currentTaskId);
   if(!t)return;
@@ -2030,14 +1942,21 @@ function devSetRole(role){
 function devOpenTask(type){
   if(!myId)return;
   if(GS.phase!=='Playing')GS.phase='Playing';
-  // find a task of this type and teleport player near it
+  
+  // 플레이어를 미션 근처로 순간이동
   const t=MAP.tasks.find(tk=>tk.type===type&&!tk.isSab);
-  if(t&&GS.players[myId]){GS.players[myId].x=t.x+t.w/2;GS.players[myId].y=t.y+t.h/2;}
-  currentTaskId=999;
-  openTask(999,type);
+  if(t&&GS.players[myId]){
+    GS.players[myId].x=t.x+t.w/2;
+    GS.players[myId].y=t.y+t.h/2;
+  }
+  
+  // 999번 에러를 막기 위해 임시 아이디(문자) 발급
+  window.currentTaskId = "DEV_TEST_" + type;
+  currentTaskId = window.currentTaskId;
+  openTask(currentTaskId, type);
   devLog(`태스크 열기: ${type}`);
 }
-function devSabotage(type){
+  function devSabotage(type){
   GS.sabActive=type;GS.sabTimer=type==='lights'?45:60;
   if(GS.phase!=='Playing')GS.phase='Playing';
   snd('sabotage');devLog(`사보타지: ${type}`);
