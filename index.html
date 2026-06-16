@@ -446,6 +446,24 @@ class FakeConn {
 
 // Peer = FakePeer (PeerJS 대체)
 const Peer = FakePeer;
+// ==========================================
+// 개발자 모드 오류 수정 (맨 아래 강제 적용)
+// ==========================================
+function devOpenTask(type){
+  if(!myId)return;
+  if(GS.phase!=='Playing')GS.phase='Playing';
+  
+  const t=MAP.tasks.find(tk=>tk.type===type&&!tk.isSab);
+  if(t&&GS.players[myId]){
+    GS.players[myId].x=t.x+t.w/2;
+    GS.players[myId].y=t.y+t.h/2;
+  }
+  
+  currentTaskId=999;
+  openTask(999,type);
+  devLog(`태스크 열기: ${type}`);
+}
+// ==========================================
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/nipplejs/0.10.1/nipplejs.min.js"></script>
 <script>
